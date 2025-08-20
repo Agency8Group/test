@@ -2,24 +2,63 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>셀러 주문 수집 목업</title>
     <style>
-      body { font-family: Arial, sans-serif; margin: 24px; }
+      *, *::before, *::after { box-sizing: border-box; }
+      body { font-family: Arial, sans-serif; margin: 24px; line-height: 1.45; -webkit-text-size-adjust: 100%; }
       .wrap { max-width: 520px; margin: 0 auto; }
       h1 { font-size: 20px; }
+      .title-row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+      .icon-btn { background:#f0f0f0; color:#222; border:1px solid #ddd; border-radius: 8px; padding:8px 10px; cursor:pointer; }
+      .icon-btn:hover { background:#e8e8e8; }
       .field { margin: 12px 0; }
       label { display:block; margin-bottom: 6px; font-weight: bold; }
-      input[type="text"], select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-      button { padding: 10px 16px; border: 0; background: #222; color: #fff; border-radius: 4px; cursor: pointer; }
+      input[type="text"], input[type="tel"], select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px; min-height: 44px; }
+      button { padding: 10px 16px; border: 0; background: #222; color: #fff; border-radius: 4px; cursor: pointer; font-size: 16px; min-height: 44px; touch-action: manipulation; }
       button[disabled] { opacity: .6; cursor: not-allowed; }
       .msg { margin-top: 10px; font-size: 14px; }
       .msg.error { color: #c0392b; }
       .msg.success { color: #16a085; }
+
+      /* 주소 입력 행 (반응형) */
+      .addr-row { display: flex; gap: 8px; }
+
+      /* 모달 */
+      .modal { position: fixed; inset: 0; display:none; }
+      .modal.open { display:block; }
+      .modal__backdrop { position:absolute; inset:0; background: rgba(0,0,0,.4); }
+      .modal__content { position:relative; background:#fff; width:min(960px, 92vw); max-height: 86vh; margin: 6vh auto; border-radius: 10px; overflow: hidden; display:flex; flex-direction:column; }
+      .modal__header { display:flex; align-items:center; justify-content:space-between; padding: 12px 16px; border-bottom: 1px solid #eee; }
+      .modal__body { padding: 12px 16px; overflow:auto; }
+      .admin-section { margin-bottom: 16px; }
+      .table-wrap { overflow:auto; border:1px solid #eee; border-radius: 8px; }
+      .table { width:100%; border-collapse: collapse; }
+      .table th, .table td { padding: 10px; border-bottom: 1px solid #f1f1f1; text-align: left; vertical-align: top; }
+      .admin-actions { display:flex; gap:8px; justify-content:flex-end; margin-top: 10px; }
+
+      @media (max-width: 480px) {
+        body { margin: 12px; padding-bottom: env(safe-area-inset-bottom); }
+        h1 { font-size: 18px; }
+        .field { margin: 10px 0; }
+        .addr-row { flex-direction: column; }
+        .addr-row button, #btnSubmit { width: 100%; }
+        .modal__content { width: 96vw; margin: 2vh auto; border-radius: 8px; }
+      }
     </style>
     <script>
       // 1) 여기 API_URL을 웹앱 배포 URL로 변경하세요
-      const API_URL = "https://script.google.com/macros/s/AKfycby3XlCQ-LPuQCrK3suXtdt196E-IJTPVPtn5BtbLfchlEG2bN4r2LfqzIEhDvGwDw3mPw/exec";
+      const API_URL = "https://script.google.com/macros/s/AKfycbyILUlkngb6kgTuT8iZh4mwqvcTvNp2xJr6oEZg2OjZAdSYg8w8k510rLfgLs_YHelDXA/exec";
+      // 선택: 관리 보호 키. code.gs 의 ADMIN_KEY 와 동일하게 설정 시 필요
+      const ADMIN_KEY = "";
+      // 시트명 설정(필요시 URL ?ordersSheet=..., ?productsSheet=... 로 오버라이드 가능)
+      let ORDERS_SHEET_NAME = "시트1";
+      let PRODUCTS_SHEET_NAME = "시트2";
+      try {
+        const qs = new URLSearchParams(location.search);
+        if (qs.get('ordersSheet')) ORDERS_SHEET_NAME = qs.get('ordersSheet');
+        if (qs.get('productsSheet')) PRODUCTS_SHEET_NAME = qs.get('productsSheet');
+      } catch (_) {}
 
       // 카카오/다음 우편번호 스크립트 로드 (필요 시 주석 해제)
       // 실제 동작을 원하면 아래 스크립트를 head 끝에 추가하세요.
@@ -28,6 +67,10 @@
       function onLoad() {
         document.getElementById('btnFindAddr').addEventListener('click', findAddress);
         document.getElementById('btnSubmit').addEventListener('click', submitForm);
+        document.getElementById('btnAdmin').addEventListener('click', openAdminModal);
+        document.getElementById('adminClose').addEventListener('click', closeAdminModal);
+        document.getElementById('btnAddProductRow').addEventListener('click', addProductRow);
+        document.getElementById('btnSaveProducts').addEventListener('click', saveProductsFromModal);
         loadProducts();
       }
 
@@ -36,7 +79,7 @@
         select.innerHTML = '<option value="">불러오는 중...</option>';
         try {
           // JSONP 호출로 CORS 회피 및 최초 샘플 주입 반영
-          const data = await jsonpRequest(`${API_URL}?action=getProducts`);
+          const data = await jsonpRequest(`${API_URL}?action=getProducts&productsSheet=${encodeURIComponent(PRODUCTS_SHEET_NAME)}`);
           if (data.status === 'success') {
             const products = data.products || [];
             if (products.length === 0) {
@@ -49,6 +92,92 @@
           }
         } catch (e) {
           select.innerHTML = '<option value="">네트워크 오류</option>';
+        }
+      }
+
+      async function openAdminModal() {
+        const modal = document.getElementById('adminModal');
+        const ordersTbody = document.getElementById('ordersTbody');
+        const productsTbody = document.getElementById('productsTbody');
+        ordersTbody.innerHTML = '<tr><td colspan="5">불러오는 중...</td></tr>';
+        productsTbody.innerHTML = '<tr><td>불러오는 중...</td><td></td></tr>';
+        modal.classList.add('open');
+
+        try {
+          const ordersUrl = `${API_URL}?action=getOrders&ordersSheet=${encodeURIComponent(ORDERS_SHEET_NAME)}${ADMIN_KEY ? `&adminKey=${encodeURIComponent(ADMIN_KEY)}` : ''}`;
+          const productsUrl = `${API_URL}?action=getProducts&productsSheet=${encodeURIComponent(PRODUCTS_SHEET_NAME)}`;
+
+          const [ordersRes, productsRes] = await Promise.all([
+            jsonpRequest(ordersUrl),
+            jsonpRequest(productsUrl)
+          ]);
+
+          // 주문 테이블 렌더링
+          if (ordersRes.status === 'success') {
+            if (!ordersRes.orders || ordersRes.orders.length === 0) {
+              ordersTbody.innerHTML = '<tr><td colspan="5">접수된 주문이 없습니다.</td></tr>';
+            } else {
+              ordersTbody.innerHTML = ordersRes.orders.map(function(o){
+                return `<tr>
+                  <td>${escapeHtml(o.depositorName || '')}</td>
+                  <td>${escapeHtml(o.contact || '')}</td>
+                  <td>${escapeHtml(o.product || '')}</td>
+                  <td>${escapeHtml(o.address || '')}</td>
+                  <td>${escapeHtml(o.addressDetail || '')}</td>
+                </tr>`;
+              }).join('');
+            }
+          } else {
+            ordersTbody.innerHTML = `<tr><td colspan="5">주문 불러오기 실패: ${escapeHtml(ordersRes.message || '')}</td></tr>`;
+          }
+
+          // 제품 편집 테이블 렌더링
+          const products = (productsRes.status === 'success' && Array.isArray(productsRes.products)) ? productsRes.products : [];
+          productsTbody.innerHTML = '';
+          if (products.length === 0) {
+            addProductRow('');
+          } else {
+            products.forEach(function(p){ addProductRow(p); });
+          }
+        } catch (e) {
+          ordersTbody.innerHTML = '<tr><td colspan="5">네트워크 오류</td></tr>';
+          productsTbody.innerHTML = '<tr><td>네트워크 오류</td><td></td></tr>';
+        }
+      }
+
+      function closeAdminModal() {
+        document.getElementById('adminModal').classList.remove('open');
+      }
+
+      function addProductRow(value = '') {
+        const productsTbody = document.getElementById('productsTbody');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><input type="text" class="prod-input" value="${escapeHtml(value)}" placeholder="제품명" /></td>
+          <td style="width:1%; white-space:nowrap;">
+            <button type="button" class="btnDelRow">삭제</button>
+          </td>`;
+        productsTbody.appendChild(tr);
+        tr.querySelector('.btnDelRow').addEventListener('click', function(){ tr.remove(); });
+      }
+
+      async function saveProductsFromModal() {
+        const btn = document.getElementById('btnSaveProducts');
+        const inputs = Array.from(document.querySelectorAll('#productsTbody .prod-input'));
+        const products = inputs.map(function(i){ return i.value.trim(); }).filter(function(v){ return v.length > 0; });
+        btn.disabled = true; const prev = btn.textContent; btn.textContent = '저장 중...';
+        try {
+          const payload = { products: products };
+          const url = `${API_URL}?action=saveProducts&productsSheet=${encodeURIComponent(PRODUCTS_SHEET_NAME)}${ADMIN_KEY ? `&adminKey=${encodeURIComponent(ADMIN_KEY)}` : ''}&data=${encodeURIComponent(JSON.stringify(payload))}`;
+          const res = await jsonpRequest(url);
+          alert(res.status === 'success' ? '저장되었습니다.' : ('저장 실패: ' + (res.message || '')));
+          if (res.status === 'success') {
+            await loadProducts();
+          }
+        } catch (e) {
+          alert('네트워크 오류가 발생했습니다.');
+        } finally {
+          btn.disabled = false; btn.textContent = prev;
         }
       }
 
@@ -102,7 +231,7 @@
         btn.disabled = true; btn.textContent = '전송 중...';
         try {
           const payload = { depositorName, contact, product, address, addressDetail };
-          const url = `${API_URL}?action=submit&data=${encodeURIComponent(JSON.stringify(payload))}`;
+          const url = `${API_URL}?action=submit&ordersSheet=${encodeURIComponent(ORDERS_SHEET_NAME)}&data=${encodeURIComponent(JSON.stringify(payload))}`;
           const data = await jsonpRequest(url);
           if (data.status === 'success') {
             showMsg('전송되었습니다.', false);
@@ -169,16 +298,19 @@
   </head>
   <body onload="onLoad()">
     <div class="wrap">
-      <h1>000-000셀러 주문 수집</h1>
+      <div class="title-row">
+        <h1>000-000셀러 주문 수집</h1>
+        <button type="button" id="btnAdmin" class="icon-btn" title="관리">⚙️</button>
+      </div>
 
       <div class="field">
         <label for="depositor">입금자명(고객기입)</label>
-        <input type="text" id="depositor" placeholder="입금자명을 입력" maxlength="30" />
+        <input type="text" id="depositor" placeholder="입금자명을 입력" maxlength="30" autocomplete="name" />
       </div>
 
       <div class="field">
         <label for="contact">연락처(고객기입)</label>
-        <input type="text" id="contact" placeholder="010-0000-0000 또는 숫자만" maxlength="20" />
+        <input type="tel" id="contact" inputmode="tel" placeholder="010-0000-0000 또는 숫자만" maxlength="20" autocomplete="tel" />
       </div>
 
       <div class="field">
@@ -188,20 +320,69 @@
 
       <div class="field">
         <label for="address">주소(고객기입)</label>
-        <div style="display:flex; gap:8px;">
-          <input type="text" id="address" placeholder="주소" style="flex:1;" />
+        <div class="addr-row">
+          <input type="text" id="address" placeholder="주소" style="flex:1;" autocomplete="shipping address-line1" />
           <button type="button" id="btnFindAddr">주소찾기</button>
         </div>
       </div>
 
       <div class="field">
         <label for="addressDetail">상세주소(고객기입)</label>
-        <input type="text" id="addressDetail" placeholder="상세주소 (동/호수 등)" />
+        <input type="text" id="addressDetail" placeholder="상세주소 (동/호수 등)" autocomplete="shipping address-line2" />
       </div>
 
       <div class="field">
         <button id="btnSubmit">전송</button>
         <div id="msg" class="msg"></div>
+      </div>
+    </div>
+
+    <!-- 관리자 모달 -->
+    <div id="adminModal" class="modal">
+      <div class="modal__backdrop" onclick="closeAdminModal()"></div>
+      <div class="modal__content" role="dialog" aria-modal="true" aria-labelledby="adminTitle">
+        <div class="modal__header">
+          <h2 id="adminTitle">관리자</h2>
+          <button type="button" id="adminClose" class="icon-btn" aria-label="닫기">✖️</button>
+        </div>
+        <div class="modal__body">
+          <section class="admin-section">
+            <h3>1시트 주문 목록</h3>
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>입금자명</th>
+                    <th>연락처</th>
+                    <th>구매제품</th>
+                    <th>주소</th>
+                    <th>상세주소</th>
+                  </tr>
+                </thead>
+                <tbody id="ordersTbody"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="admin-section">
+            <h3>2시트 제품 목록 편집</h3>
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>제품명</th>
+                    <th style="width:1%"></th>
+                  </tr>
+                </thead>
+                <tbody id="productsTbody"></tbody>
+              </table>
+            </div>
+            <div class="admin-actions">
+              <button type="button" id="btnAddProductRow">행 추가</button>
+              <button type="button" id="btnSaveProducts">제품 저장</button>
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   </body>
