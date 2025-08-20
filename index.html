@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>셀러 주문 수집 목업</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 24px; }
+      .wrap { max-width: 520px; margin: 0 auto; }
+      h1 { font-size: 20px; }
+      .field { margin: 12px 0; }
+      label { display:block; margin-bottom: 6px; font-weight: bold; }
+      input[type="text"], select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+      button { padding: 10px 16px; border: 0; background: #222; color: #fff; border-radius: 4px; cursor: pointer; }
+      button[disabled] { opacity: .6; cursor: not-allowed; }
+      .msg { margin-top: 10px; font-size: 14px; }
+      .msg.error { color: #c0392b; }
+      .msg.success { color: #16a085; }
+    </style>
+    <script>
+      // 1) 여기 API_URL을 웹앱 배포 URL로 변경하세요
+      const API_URL = "https://script.google.com/macros/s/AKfycby3XlCQ-LPuQCrK3suXtdt196E-IJTPVPtn5BtbLfchlEG2bN4r2LfqzIEhDvGwDw3mPw/exec";
+
+      // 카카오/다음 우편번호 스크립트 로드 (필요 시 주석 해제)
+      // 실제 동작을 원하면 아래 스크립트를 head 끝에 추가하세요.
+      // <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"><\/script>
+
+      function onLoad() {
+        document.getElementById('btnFindAddr').addEventListener('click', findAddress);
+        document.getElementById('btnSubmit').addEventListener('click', submitForm);
+        loadProducts();
+      }
+
+      async function loadProducts() {
+        const select = document.getElementById('product');
+        select.innerHTML = '<option value="">불러오는 중...</option>';
+        try {
+          // JSONP 호출로 CORS 회피 및 최초 샘플 주입 반영
+          const data = await jsonpRequest(`${API_URL}?action=getProducts`);
+          if (data.status === 'success') {
+            const products = data.products || [];
+            if (products.length === 0) {
+              select.innerHTML = '<option value="">제품이 없습니다 (시트2에 입력)</option>';
+            } else {
+              select.innerHTML = '<option value="">제품을 선택하세요</option>' + products.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+            }
+          } else {
+            select.innerHTML = '<option value="">불러오기 실패</option>';
+          }
+        } catch (e) {
+          select.innerHTML = '<option value="">네트워크 오류</option>';
+        }
+      }
+
+      function findAddress() {
+        if (window.daum && window.daum.Postcode) {
+          new daum.Postcode({
+            oncomplete: function (data) {
+              var addr = data.roadAddress && data.roadAddress.length > 0 ? data.roadAddress : data.jibunAddress;
+              var extra = data.buildingName && data.buildingName.length > 0 ? ' ' + data.buildingName : '';
+              var full = (data.zonecode ? '[' + data.zonecode + '] ' : '') + addr + extra;
+              var input = document.getElementById('address');
+              input.value = full.trim();
+              input.focus();
+            }
+          }).open();
+        } else {
+          // 라이브러리 로드 실패 시 간단 프롬프트로 폴백
+          const addr = prompt('주소를 입력하세요');
+          if (addr) {
+            document.getElementById('address').value = addr.trim();
+          }
+        }
+      }
+
+      async function submitForm() {
+        const depositorName = document.getElementById('depositor').value.trim();
+        const contact = document.getElementById('contact').value.trim();
+        const product = document.getElementById('product').value.trim();
+        const address = document.getElementById('address').value.trim();
+        const addressDetail = document.getElementById('addressDetail').value.trim();
+        const btn = document.getElementById('btnSubmit');
+        const msg = document.getElementById('msg');
+
+        msg.textContent = '';
+        msg.className = 'msg';
+
+        if (!depositorName) {
+          showMsg('입금자명을 입력하세요.', true); return;
+        }
+        if (!contact) {
+          showMsg('연락처를 입력하세요.', true); return;
+        }
+        if (!product) {
+          showMsg('구매제품을 선택하세요.', true); return;
+        }
+        if (!address) {
+          showMsg('주소를 입력하세요.', true); return;
+        }
+        // 상세주소는 선택 입력 (필수 아님)
+
+        btn.disabled = true; btn.textContent = '전송 중...';
+        try {
+          const payload = { depositorName, contact, product, address, addressDetail };
+          const url = `${API_URL}?action=submit&data=${encodeURIComponent(JSON.stringify(payload))}`;
+          const data = await jsonpRequest(url);
+          if (data.status === 'success') {
+            showMsg('전송되었습니다.', false);
+            // reset
+            document.getElementById('depositor').value = '';
+            document.getElementById('contact').value = '';
+            document.getElementById('product').value = '';
+            document.getElementById('address').value = '';
+            document.getElementById('addressDetail').value = '';
+          } else {
+            showMsg('전송 실패: ' + (data.message || ''), true);
+          }
+        } catch (e) {
+          showMsg('네트워크 오류가 발생했습니다.', true);
+        } finally {
+          btn.disabled = false; btn.textContent = '전송';
+        }
+      }
+
+      function showMsg(text, isError) {
+        const el = document.getElementById('msg');
+        el.textContent = text;
+        el.className = 'msg ' + (isError ? 'error' : 'success');
+      }
+
+      function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      // JSONP 유틸리티: callback 파라미터 자동 부여
+      function jsonpRequest(url, timeoutMs = 10000) {
+        return new Promise((resolve, reject) => {
+          const cbName = `__jsonp_cb_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+          const sep = url.indexOf('?') >= 0 ? '&' : '?';
+          const script = document.createElement('script');
+          let timeoutId = setTimeout(() => {
+            cleanup();
+            reject(new Error('JSONP timeout'));
+          }, timeoutMs);
+
+          function cleanup() {
+            if (timeoutId) clearTimeout(timeoutId);
+            try { delete window[cbName]; } catch (_) { window[cbName] = undefined; }
+            if (script && script.parentNode) script.parentNode.removeChild(script);
+          }
+
+          window[cbName] = function (data) {
+            cleanup();
+            resolve(data);
+          };
+
+          script.onerror = function () {
+            cleanup();
+            reject(new Error('JSONP load error'));
+          };
+
+          script.src = `${url}${sep}callback=${cbName}`;
+          document.head.appendChild(script);
+        });
+      }
+    </script>
+  </head>
+  <body onload="onLoad()">
+    <div class="wrap">
+      <h1>000-000셀러 주문 수집</h1>
+
+      <div class="field">
+        <label for="depositor">입금자명(고객기입)</label>
+        <input type="text" id="depositor" placeholder="입금자명을 입력" maxlength="30" />
+      </div>
+
+      <div class="field">
+        <label for="contact">연락처(고객기입)</label>
+        <input type="text" id="contact" placeholder="010-0000-0000 또는 숫자만" maxlength="20" />
+      </div>
+
+      <div class="field">
+        <label for="product">구매제품 (셀러수정가능)</label>
+        <select id="product"></select>
+      </div>
+
+      <div class="field">
+        <label for="address">주소(고객기입)</label>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="address" placeholder="주소" style="flex:1;" />
+          <button type="button" id="btnFindAddr">주소찾기</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="addressDetail">상세주소(고객기입)</label>
+        <input type="text" id="addressDetail" placeholder="상세주소 (동/호수 등)" />
+      </div>
+
+      <div class="field">
+        <button id="btnSubmit">전송</button>
+        <div id="msg" class="msg"></div>
+      </div>
+    </div>
+  </body>
+  <!-- 카카오/다음 우편번호 라이브러리 -->
+  <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+</html>
+
+
