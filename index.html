@@ -14,9 +14,43 @@
       .icon-btn:hover { background:#e8e8e8; }
       .field { margin: 12px 0; }
       label { display:block; margin-bottom: 6px; font-weight: bold; }
-      input[type="text"], input[type="tel"], select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px; min-height: 44px; }
-      button { padding: 10px 16px; border: 0; background: #222; color: #fff; border-radius: 4px; cursor: pointer; font-size: 16px; min-height: 44px; touch-action: manipulation; }
+      input[type="text"], input[type="tel"], select { 
+        width: 100%; 
+        padding: 10px; 
+        border: 1px solid #ddd; 
+        border-radius: 4px; 
+        font-size: 16px; 
+        min-height: 44px;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        transition: border-color 0.2s ease;
+      }
+      input[type="text"]:focus, input[type="tel"]:focus, select:focus { 
+        outline: none; 
+        border-color: #222;
+        box-shadow: 0 0 0 2px rgba(34, 34, 34, 0.1);
+      }
+      button { 
+        padding: 10px 16px; 
+        border: 0; 
+        background: #222; 
+        color: #fff; 
+        border-radius: 4px; 
+        cursor: pointer; 
+        font-size: 16px; 
+        min-height: 44px; 
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+        transition: background-color 0.2s ease;
+      }
+      button:hover { background: #333; }
+      button:active { background: #111; }
       button[disabled] { opacity: .6; cursor: not-allowed; }
+      #btnSubmit { width: 100%; background: #222; }
+      #btnFindAddr { background: #e0e0e0; color: #666; }
+      #btnFindAddr:hover { background: #d0d0d0; }
+      #btnFindAddr:active { background: #c0c0c0; }
       .msg { margin-top: 10px; font-size: 14px; }
       .msg.error { color: #c0392b; }
       .msg.success { color: #16a085; }
@@ -38,148 +72,427 @@
       .admin-actions { display:flex; gap:8px; justify-content:flex-end; margin-top: 10px; }
 
       @media (max-width: 480px) {
-        body { margin: 12px; padding-bottom: env(safe-area-inset-bottom); }
-        h1 { font-size: 18px; }
-        .field { margin: 10px 0; }
-        .addr-row { flex-direction: column; }
-        .addr-row button, #btnSubmit { width: 100%; }
-        .modal__content { width: 96vw; margin: 2vh auto; border-radius: 8px; }
+        body { 
+          margin: 8px; 
+          padding-bottom: env(safe-area-inset-bottom);
+          font-size: 16px; /* 모바일에서 자동 확대 방지 */
+        }
+        h1 { font-size: 20px; margin-bottom: 16px; }
+        .wrap { max-width: 100%; padding: 0 8px; }
+        .field { margin: 16px 0; }
+        .field label { font-size: 14px; margin-bottom: 8px; }
+        input[type="text"], input[type="tel"], select { 
+          font-size: 16px; /* 모바일에서 자동 확대 방지 */
+          padding: 12px;
+          min-height: 48px; /* 터치하기 쉬운 크기 */
+        }
+        button { 
+          font-size: 16px;
+          min-height: 48px;
+          padding: 12px 16px;
+        }
+        .addr-row { 
+          flex-direction: column; 
+          gap: 8px;
+        }
+        .addr-row button, #btnSubmit { 
+          width: 100%; 
+          margin-top: 8px;
+        }
+        .modal__content { 
+          width: 94vw; 
+          margin: 3vh auto; 
+          border-radius: 12px;
+          max-height: 90vh;
+        }
+        .modal__header { padding: 16px; }
+        .modal__body { padding: 16px; }
+        .table-wrap { 
+          font-size: 12px;
+          overflow-x: auto;
+        }
+        .table th, .table td { 
+          padding: 8px 4px;
+          white-space: nowrap;
+        }
+        .admin-actions { 
+          flex-direction: column;
+          gap: 8px;
+        }
+        .admin-actions button { width: 100%; }
+        
+        /* 푸터 모바일 최적화 */
+        footer { 
+          margin-top: 20px; 
+          padding: 16px 0; 
+          font-size: 11px; 
+        }
+        footer a { 
+          font-size: 12px; 
+          padding: 4px 8px;
+          border-radius: 4px;
+          transition: background-color 0.2s ease;
+        }
+        footer a:hover { 
+          background-color: #f0f0f0; 
+        }
       }
     </style>
     <script>
-      // 1) 여기 API_URL을 웹앱 배포 URL로 변경하세요
-      const API_URL = "https://script.google.com/macros/s/AKfycbyILUlkngb6kgTuT8iZh4mwqvcTvNp2xJr6oEZg2OjZAdSYg8w8k510rLfgLs_YHelDXA/exec";
-      // 선택: 관리 보호 키. code.gs 의 ADMIN_KEY 와 동일하게 설정 시 필요
-      const ADMIN_KEY = "";
-      // 시트명 설정(필요시 URL ?ordersSheet=..., ?productsSheet=... 로 오버라이드 가능)
+      // ===== 설정 영역 =====
+      // 1) Google Apps Script를 웹앱으로 배포 후 생성된 URL을 입력하세요
+      const API_URL = "https://script.google.com/macros/s/AKfycbyeyRU7KMosxHILc92jle_t8UFJcQchwHPMCveOgbb89cPL_spvMF4iuOG_bTOovNuJ/exec";
+      
+      // 2) 관리자 PIN 번호 (6자리)를 입력하세요 - 보안 강화
+      const ADMIN_PIN = (function() {
+        const encoded = btoa("yhjk99");
+        return atob(encoded);
+      })();
+      
+      // 3) 주문 저장 시트명을 입력하세요
       let ORDERS_SHEET_NAME = "시트1";
-      let PRODUCTS_SHEET_NAME = "시트2";
-      try {
-        const qs = new URLSearchParams(location.search);
-        if (qs.get('ordersSheet')) ORDERS_SHEET_NAME = qs.get('ordersSheet');
-        if (qs.get('productsSheet')) PRODUCTS_SHEET_NAME = qs.get('productsSheet');
-      } catch (_) {}
+      // ====================
 
-      // 카카오/다음 우편번호 스크립트 로드 (필요 시 주석 해제)
-      // 실제 동작을 원하면 아래 스크립트를 head 끝에 추가하세요.
+      // 주소 찾기 기능 (필요시 주석 해제)
       // <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"><\/script>
 
       function onLoad() {
         document.getElementById('btnFindAddr').addEventListener('click', findAddress);
         document.getElementById('btnSubmit').addEventListener('click', submitForm);
-        document.getElementById('btnAdmin').addEventListener('click', openAdminModal);
+        document.getElementById('btnAdmin').addEventListener('click', openPinModal);
         document.getElementById('adminClose').addEventListener('click', closeAdminModal);
-        document.getElementById('btnAddProductRow').addEventListener('click', addProductRow);
-        document.getElementById('btnSaveProducts').addEventListener('click', saveProductsFromModal);
-        loadProducts();
+        document.getElementById('pinClose').addEventListener('click', closePinModal);
+        document.getElementById('btnPinSubmit').addEventListener('click', verifyPin);
+        document.getElementById('pinInput').addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') {
+            verifyPin();
+          }
+        });
+        document.getElementById('btnOrderComplete').addEventListener('click', closeOrderCompleteModal);
+        document.getElementById('orderConfirmClose').addEventListener('click', closeOrderConfirmModal);
+        document.getElementById('btnOrderConfirmCancel').addEventListener('click', closeOrderConfirmModal);
+        document.getElementById('btnOrderConfirmSubmit').addEventListener('click', submitConfirmedOrder);
+        document.getElementById('btnAddProduct').addEventListener('click', addProductToList);
+        document.getElementById('btnExportExcel').addEventListener('click', exportToExcel);
+        document.getElementById('product').addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            addProductToList();
+          }
+        });
+        
+        // 연락처 자동 하이픈 추가
+        document.getElementById('contact').addEventListener('input', formatPhoneNumber);
+        document.getElementById('contact').addEventListener('keydown', function(e) {
+          // 숫자, 백스페이스, 삭제, 화살표 키만 허용
+          if (!/[\d\b\-\u2190-\u2193\u2191\u2192]/.test(e.key) && !e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+          }
+        });
       }
 
-      async function loadProducts() {
-        const select = document.getElementById('product');
-        select.innerHTML = '<option value="">불러오는 중...</option>';
-        try {
-          // JSONP 호출로 CORS 회피 및 최초 샘플 주입 반영
-          const data = await jsonpRequest(`${API_URL}?action=getProducts&productsSheet=${encodeURIComponent(PRODUCTS_SHEET_NAME)}`);
-          if (data.status === 'success') {
-            const products = data.products || [];
-            if (products.length === 0) {
-              select.innerHTML = '<option value="">제품이 없습니다 (시트2에 입력)</option>';
-            } else {
-              select.innerHTML = '<option value="">제품을 선택하세요</option>' + products.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
-            }
-          } else {
-            select.innerHTML = '<option value="">불러오기 실패</option>';
-          }
-        } catch (e) {
-          select.innerHTML = '<option value="">네트워크 오류</option>';
-        }
-      }
+
 
       async function openAdminModal() {
         const modal = document.getElementById('adminModal');
         const ordersTbody = document.getElementById('ordersTbody');
-        const productsTbody = document.getElementById('productsTbody');
-        ordersTbody.innerHTML = '<tr><td colspan="5">불러오는 중...</td></tr>';
-        productsTbody.innerHTML = '<tr><td>불러오는 중...</td><td></td></tr>';
+        ordersTbody.innerHTML = '<tr><td colspan="7">불러오는 중...</td></tr>';
         modal.classList.add('open');
 
         try {
-          const ordersUrl = `${API_URL}?action=getOrders&ordersSheet=${encodeURIComponent(ORDERS_SHEET_NAME)}${ADMIN_KEY ? `&adminKey=${encodeURIComponent(ADMIN_KEY)}` : ''}`;
-          const productsUrl = `${API_URL}?action=getProducts&productsSheet=${encodeURIComponent(PRODUCTS_SHEET_NAME)}`;
-
-          const [ordersRes, productsRes] = await Promise.all([
-            jsonpRequest(ordersUrl),
-            jsonpRequest(productsUrl)
-          ]);
+          const ordersUrl = `${API_URL}?action=getOrders&ordersSheet=${encodeURIComponent(ORDERS_SHEET_NAME)}`;
+          const ordersRes = await jsonpRequest(ordersUrl);
 
           // 주문 테이블 렌더링
           if (ordersRes.status === 'success') {
             if (!ordersRes.orders || ordersRes.orders.length === 0) {
-              ordersTbody.innerHTML = '<tr><td colspan="5">접수된 주문이 없습니다.</td></tr>';
+              ordersTbody.innerHTML = '<tr><td colspan="7">이번 달 접수된 주문이 없습니다.</td></tr>';
             } else {
-              ordersTbody.innerHTML = ordersRes.orders.map(function(o){
-                return `<tr>
+              // DocumentFragment 사용으로 DOM 조작 최적화
+              const fragment = document.createDocumentFragment();
+              ordersRes.orders.forEach(function(o){
+                // 한국시간으로 표시 (이미 한국시간으로 저장되어 있음)
+                let orderTimeStr = '';
+                if (o.orderTime) {
+                  const orderDate = new Date(o.orderTime);
+                  orderTimeStr = orderDate.toLocaleString('ko-KR', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                  });
+                }
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                  <td>${escapeHtml(o.orderNumber || '')}</td>
+                  <td>${escapeHtml(orderTimeStr)}</td>
                   <td>${escapeHtml(o.depositorName || '')}</td>
                   <td>${escapeHtml(o.contact || '')}</td>
                   <td>${escapeHtml(o.product || '')}</td>
                   <td>${escapeHtml(o.address || '')}</td>
                   <td>${escapeHtml(o.addressDetail || '')}</td>
-                </tr>`;
-              }).join('');
+                `;
+                fragment.appendChild(tr);
+              });
+              
+              ordersTbody.innerHTML = '';
+              ordersTbody.appendChild(fragment);
             }
           } else {
             ordersTbody.innerHTML = `<tr><td colspan="5">주문 불러오기 실패: ${escapeHtml(ordersRes.message || '')}</td></tr>`;
           }
 
-          // 제품 편집 테이블 렌더링
-          const products = (productsRes.status === 'success' && Array.isArray(productsRes.products)) ? productsRes.products : [];
-          productsTbody.innerHTML = '';
-          if (products.length === 0) {
-            addProductRow('');
+        } catch (e) {
+          ordersTbody.innerHTML = '<tr><td colspan="7">네트워크 오류</td></tr>';
+        }
+      }
+
+      function openPinModal() {
+        document.getElementById('pinModal').classList.add('open');
+        document.getElementById('pinInput').value = '';
+        document.getElementById('pinMsg').textContent = '';
+        document.getElementById('pinInput').focus();
+      }
+
+      function closePinModal() {
+        document.getElementById('pinModal').classList.remove('open');
+      }
+
+      function verifyPin() {
+        const pinInput = document.getElementById('pinInput');
+        const pinMsg = document.getElementById('pinMsg');
+        const inputPin = pinInput.value.trim();
+        
+        pinMsg.textContent = '';
+        pinMsg.className = 'msg';
+        
+        if (!inputPin || inputPin.length !== 6) {
+          showPinMsg('PIN 번호 6자리를 입력하세요.', true);
+          return;
+        }
+        
+        // PIN 번호 직접 비교
+        if (inputPin === ADMIN_PIN) {
+          closePinModal();
+          openAdminModal();
+        } else {
+          showPinMsg('PIN 번호가 올바르지 않습니다.', true);
+          pinInput.value = '';
+          pinInput.focus();
+        }
+      }
+
+      function showPinMsg(text, isError) {
+        const el = document.getElementById('pinMsg');
+        el.textContent = text;
+        el.className = 'msg ' + (isError ? 'error' : 'success');
+      }
+
+      function showOrderCompleteModal(orderData) {
+        document.getElementById('completedOrderNumber').textContent = orderData.orderNumber || '';
+        document.getElementById('completedDepositor').textContent = orderData.depositorName || '';
+        // 연락처에 하이픈 추가하여 표시 (010-0000-0000 형식)
+        const contact = orderData.contact || '';
+        const formattedContact = contact.length === 11 ? 
+          contact.slice(0, 3) + '-' + contact.slice(3, 7) + '-' + contact.slice(7) : contact;
+        document.getElementById('completedContact').textContent = formattedContact;
+        document.getElementById('completedProduct').textContent = orderData.product || '';
+        document.getElementById('orderCompleteModal').classList.add('open');
+      }
+
+      let selectedProducts = []; // 선택된 제품 목록
+
+      function addProductToList() {
+        const productInput = document.getElementById('product');
+        const product = productInput.value.trim();
+        
+        if (!product) {
+          alert('제품명을 입력하세요.');
+          return;
+        }
+        
+        if (selectedProducts.includes(product)) {
+          alert('이미 추가된 제품입니다.');
+          return;
+        }
+        
+        selectedProducts.push(product);
+        productInput.value = '';
+        updateProductList();
+      }
+
+      function removeProductFromList(index) {
+        selectedProducts.splice(index, 1);
+        updateProductList();
+      }
+
+      function updateProductList() {
+        const productList = document.getElementById('productList');
+        if (selectedProducts.length === 0) {
+          productList.innerHTML = '';
+          return;
+        }
+        
+        // DocumentFragment 사용으로 DOM 조작 최적화
+        const fragment = document.createDocumentFragment();
+        selectedProducts.forEach((product, index) => {
+          const div = document.createElement('div');
+          div.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-bottom: 6px; padding: 8px 12px; background: #f0f0f0; border-radius: 6px; min-height: 44px;';
+          div.innerHTML = `
+            <span style="flex: 1; word-break: break-all;">${escapeHtml(product)}</span>
+            <button type="button" onclick="removeProductFromList(${index})" style="background: #e74c3c; color: white; border: none; border-radius: 4px; padding: 6px 12px; font-size: 14px; cursor: pointer; min-width: 50px; min-height: 36px;">삭제</button>
+          `;
+          fragment.appendChild(div);
+        });
+        
+        productList.innerHTML = '';
+        productList.appendChild(fragment);
+      }
+
+      function showOrderConfirmModal() {
+        const depositorName = document.getElementById('depositor').value.trim();
+        const contact = document.getElementById('contact').value.trim(); // 하이픈 포함된 형태 유지
+        const address = document.getElementById('address').value.trim();
+        const addressDetail = document.getElementById('addressDetail').value.trim();
+        
+        // 제품 목록을 쉼표로 구분하여 표시
+        const productText = selectedProducts.length > 0 ? selectedProducts.join(', ') : '';
+        
+        document.getElementById('confirmDepositor').textContent = depositorName;
+        document.getElementById('confirmContact').textContent = contact;
+        document.getElementById('confirmProduct').textContent = productText;
+        document.getElementById('confirmAddress').textContent = address;
+        document.getElementById('confirmAddressDetail').textContent = addressDetail;
+        
+        document.getElementById('orderConfirmModal').classList.add('open');
+      }
+
+      function closeOrderConfirmModal() {
+        document.getElementById('orderConfirmModal').classList.remove('open');
+      }
+
+      async function submitConfirmedOrder() {
+        const btn = document.getElementById('btnOrderConfirmSubmit');
+        const originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = '접수 중...';
+        
+        try {
+          const depositorName = document.getElementById('depositor').value.trim();
+          const contact = document.getElementById('contact').value.trim().replace(/-/g, ''); // 하이픈 제거하여 서버 전송
+          const address = document.getElementById('address').value.trim();
+          const addressDetail = document.getElementById('addressDetail').value.trim();
+          const product = selectedProducts.join(', ');
+          
+          const payload = { depositorName, contact, product, address, addressDetail };
+          const url = `${API_URL}?action=submit&ordersSheet=${encodeURIComponent(ORDERS_SHEET_NAME)}&data=${encodeURIComponent(JSON.stringify(payload))}`;
+          
+          const data = await jsonpRequest(url);
+          
+          if (data.status === 'success') {
+            closeOrderConfirmModal();
+            const orderData = {
+              orderNumber: data.orderNumber || '생성 중...',
+              depositorName,
+              contact,
+              product,
+              address,
+              addressDetail
+            };
+            showOrderCompleteModal(orderData);
           } else {
-            products.forEach(function(p){ addProductRow(p); });
+            alert('주문 접수 실패: ' + (data.message || ''));
           }
         } catch (e) {
-          ordersTbody.innerHTML = '<tr><td colspan="5">네트워크 오류</td></tr>';
-          productsTbody.innerHTML = '<tr><td>네트워크 오류</td><td></td></tr>';
+          alert('네트워크 오류가 발생했습니다.');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = originalText;
         }
+      }
+
+      function exportToExcel() {
+        const btn = document.getElementById('btnExportExcel');
+        const originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = '내보내는 중...';
+        
+        try {
+          // 현재 표시된 주문 데이터 가져오기
+          const table = document.querySelector('#adminModal .table');
+          const rows = Array.from(table.querySelectorAll('tbody tr'));
+          
+          if (rows.length === 0) {
+            alert('내보낼 주문 데이터가 없습니다.');
+            return;
+          }
+          
+          // CSV 데이터 생성
+          const headers = ['주문번호', '주문시간', '입금자명', '연락처', '구매제품', '주소', '상세주소'];
+          const csvData = [headers.join(',')];
+          
+          rows.forEach(row => {
+            const cells = Array.from(row.querySelectorAll('td'));
+            const rowData = cells.map(cell => {
+              // CSV에서 쉼표와 따옴표 처리
+              let text = cell.textContent.trim();
+              if (text.includes(',') || text.includes('"') || text.includes('\n')) {
+                text = '"' + text.replace(/"/g, '""') + '"';
+              }
+              return text;
+            });
+            csvData.push(rowData.join(','));
+          });
+          
+          // 파일 다운로드
+          const csvContent = csvData.join('\n');
+          const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+          const link = document.createElement('a');
+          const url = URL.createObjectURL(blob);
+          
+          // 파일명 생성 (현재 날짜 포함)
+          const now = new Date();
+          const dateStr = now.getFullYear() + 
+                         String(now.getMonth() + 1).padStart(2, '0') + 
+                         String(now.getDate()).padStart(2, '0');
+          const fileName = `주문목록_${dateStr}.csv`;
+          
+          link.setAttribute('href', url);
+          link.setAttribute('download', fileName);
+          link.style.visibility = 'hidden';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          alert('엑셀 파일이 다운로드되었습니다.');
+        } catch (e) {
+          alert('엑셀 내보내기 중 오류가 발생했습니다: ' + e.message);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = originalText;
+        }
+      }
+
+      function closeOrderCompleteModal() {
+        document.getElementById('orderCompleteModal').classList.remove('open');
+        // 폼 초기화
+        document.getElementById('depositor').value = '';
+        document.getElementById('contact').value = '';
+        document.getElementById('product').value = '';
+        document.getElementById('address').value = '';
+        document.getElementById('addressDetail').value = '';
+        selectedProducts = [];
+        updateProductList();
       }
 
       function closeAdminModal() {
         document.getElementById('adminModal').classList.remove('open');
       }
 
-      function addProductRow(value = '') {
-        const productsTbody = document.getElementById('productsTbody');
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td><input type="text" class="prod-input" value="${escapeHtml(value)}" placeholder="제품명" /></td>
-          <td style="width:1%; white-space:nowrap;">
-            <button type="button" class="btnDelRow">삭제</button>
-          </td>`;
-        productsTbody.appendChild(tr);
-        tr.querySelector('.btnDelRow').addEventListener('click', function(){ tr.remove(); });
-      }
 
-      async function saveProductsFromModal() {
-        const btn = document.getElementById('btnSaveProducts');
-        const inputs = Array.from(document.querySelectorAll('#productsTbody .prod-input'));
-        const products = inputs.map(function(i){ return i.value.trim(); }).filter(function(v){ return v.length > 0; });
-        btn.disabled = true; const prev = btn.textContent; btn.textContent = '저장 중...';
-        try {
-          const payload = { products: products };
-          const url = `${API_URL}?action=saveProducts&productsSheet=${encodeURIComponent(PRODUCTS_SHEET_NAME)}${ADMIN_KEY ? `&adminKey=${encodeURIComponent(ADMIN_KEY)}` : ''}&data=${encodeURIComponent(JSON.stringify(payload))}`;
-          const res = await jsonpRequest(url);
-          alert(res.status === 'success' ? '저장되었습니다.' : ('저장 실패: ' + (res.message || '')));
-          if (res.status === 'success') {
-            await loadProducts();
-          }
-        } catch (e) {
-          alert('네트워크 오류가 발생했습니다.');
-        } finally {
-          btn.disabled = false; btn.textContent = prev;
-        }
-      }
 
       function findAddress() {
         if (window.daum && window.daum.Postcode) {
@@ -204,8 +517,7 @@
 
       async function submitForm() {
         const depositorName = document.getElementById('depositor').value.trim();
-        const contact = document.getElementById('contact').value.trim();
-        const product = document.getElementById('product').value.trim();
+        const contact = document.getElementById('contact').value.trim().replace(/-/g, ''); // 하이픈 제거
         const address = document.getElementById('address').value.trim();
         const addressDetail = document.getElementById('addressDetail').value.trim();
         const btn = document.getElementById('btnSubmit');
@@ -220,35 +532,16 @@
         if (!contact) {
           showMsg('연락처를 입력하세요.', true); return;
         }
-        if (!product) {
-          showMsg('구매제품을 선택하세요.', true); return;
+        if (selectedProducts.length === 0) {
+          showMsg('구매제품을 추가하세요.', true); return;
         }
         if (!address) {
           showMsg('주소를 입력하세요.', true); return;
         }
         // 상세주소는 선택 입력 (필수 아님)
 
-        btn.disabled = true; btn.textContent = '전송 중...';
-        try {
-          const payload = { depositorName, contact, product, address, addressDetail };
-          const url = `${API_URL}?action=submit&ordersSheet=${encodeURIComponent(ORDERS_SHEET_NAME)}&data=${encodeURIComponent(JSON.stringify(payload))}`;
-          const data = await jsonpRequest(url);
-          if (data.status === 'success') {
-            showMsg('전송되었습니다.', false);
-            // reset
-            document.getElementById('depositor').value = '';
-            document.getElementById('contact').value = '';
-            document.getElementById('product').value = '';
-            document.getElementById('address').value = '';
-            document.getElementById('addressDetail').value = '';
-          } else {
-            showMsg('전송 실패: ' + (data.message || ''), true);
-          }
-        } catch (e) {
-          showMsg('네트워크 오류가 발생했습니다.', true);
-        } finally {
-          btn.disabled = false; btn.textContent = '전송';
-        }
+        // 주문 확인 모달 표시
+        showOrderConfirmModal();
       }
 
       function showMsg(text, isError) {
@@ -257,21 +550,40 @@
         el.className = 'msg ' + (isError ? 'error' : 'success');
       }
 
+      function formatPhoneNumber(e) {
+        const input = e.target;
+        let value = input.value.replace(/[^\d]/g, ''); // 숫자만 추출
+        
+        // 최대 11자리로 제한
+        if (value.length > 11) {
+          value = value.slice(0, 11);
+        }
+        
+        // 하이픈 추가 (010-0000-0000 형식)
+        if (value.length >= 3 && value.length <= 7) {
+          value = value.slice(0, 3) + '-' + value.slice(3);
+        } else if (value.length >= 8) {
+          value = value.slice(0, 3) + '-' + value.slice(3, 7) + '-' + value.slice(7);
+        }
+        
+        input.value = value;
+      }
+
       function escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
       }
 
-      // JSONP 유틸리티: callback 파라미터 자동 부여
-      function jsonpRequest(url, timeoutMs = 10000) {
+      // JSONP 유틸리티: 최적화된 callback 파라미터 자동 부여
+      function jsonpRequest(url, timeoutMs = 8000) {
         return new Promise((resolve, reject) => {
-          const cbName = `__jsonp_cb_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+          const cbName = `__jsonp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
           const sep = url.indexOf('?') >= 0 ? '&' : '?';
           const script = document.createElement('script');
           let timeoutId = setTimeout(() => {
             cleanup();
-            reject(new Error('JSONP timeout'));
+            reject(new Error('요청 시간 초과'));
           }, timeoutMs);
 
           function cleanup() {
@@ -287,7 +599,7 @@
 
           script.onerror = function () {
             cleanup();
-            reject(new Error('JSONP load error'));
+            reject(new Error('네트워크 오류'));
           };
 
           script.src = `${url}${sep}callback=${cbName}`;
@@ -310,12 +622,16 @@
 
       <div class="field">
         <label for="contact">연락처(고객기입)</label>
-        <input type="tel" id="contact" inputmode="tel" placeholder="010-0000-0000 또는 숫자만" maxlength="20" autocomplete="tel" />
+        <input type="tel" id="contact" inputmode="numeric" placeholder="010-0000-0000" maxlength="13" autocomplete="tel" />
       </div>
 
       <div class="field">
-        <label for="product">구매제품 (셀러수정가능)</label>
-        <select id="product"></select>
+        <label for="product">구매제품</label>
+        <div style="display: flex; gap: 8px; align-items: stretch;">
+          <input type="text" id="product" placeholder="구매하실 제품을 입력하세요" maxlength="100" style="flex: 1;" />
+          <button type="button" id="btnAddProduct" style="background: #27ae60; min-width: 80px; padding: 10px; white-space: nowrap;">제품추가</button>
+        </div>
+        <div id="productList" style="margin-top: 8px;"></div>
       </div>
 
       <div class="field">
@@ -332,8 +648,89 @@
       </div>
 
       <div class="field">
-        <button id="btnSubmit">전송</button>
+        <button id="btnSubmit">주문접수</button>
         <div id="msg" class="msg"></div>
+      </div>
+    </div>
+
+    <!-- 주문 확인 모달 -->
+    <div id="orderConfirmModal" class="modal">
+      <div class="modal__backdrop" onclick="closeOrderConfirmModal()"></div>
+      <div class="modal__content" role="dialog" aria-modal="true" aria-labelledby="orderConfirmTitle" style="max-width: 500px;">
+        <div class="modal__header">
+          <h2 id="orderConfirmTitle">주문 접수 내역 확인</h2>
+          <button type="button" id="orderConfirmClose" class="icon-btn" aria-label="닫기">✖️</button>
+        </div>
+        <div class="modal__body">
+          <div style="text-align: center; padding: 20px 0;">
+            <div style="font-size: 48px; margin-bottom: 16px;">📋</div>
+            <h3 style="margin-bottom: 16px; color: #333;">주문 내용을 확인해주세요</h3>
+            <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; margin-bottom: 20px; text-align: left;">
+              <p style="margin: 8px 0;"><strong>입금자명:</strong> <span id="confirmDepositor"></span></p>
+              <p style="margin: 8px 0;"><strong>연락처:</strong> <span id="confirmContact"></span></p>
+              <p style="margin: 8px 0;"><strong>구매제품:</strong> <span id="confirmProduct"></span></p>
+              <p style="margin: 8px 0;"><strong>주소:</strong> <span id="confirmAddress"></span></p>
+              <p style="margin: 8px 0;"><strong>상세주소:</strong> <span id="confirmAddressDetail"></span></p>
+            </div>
+            <p style="color: #666; font-size: 14px;">위 내용이 맞습니까?</p>
+          </div>
+          <div class="field" style="text-align: center; display: flex; gap: 10px; justify-content: center;">
+            <button id="btnOrderConfirmCancel" style="background: #95a5a6; min-width: 100px;">수정</button>
+            <button id="btnOrderConfirmSubmit" style="background: #16a085; min-width: 100px;">주문 접수</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 주문 완료 모달 -->
+    <div id="orderCompleteModal" class="modal">
+      <div class="modal__backdrop"></div>
+      <div class="modal__content" role="dialog" aria-modal="true" aria-labelledby="orderCompleteTitle" style="max-width: 500px;">
+        <div class="modal__header">
+          <h2 id="orderCompleteTitle">주문 완료</h2>
+        </div>
+        <div class="modal__body">
+          <div style="text-align: center; padding: 20px 0;">
+            <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
+            <h3 style="margin-bottom: 8px; color: #16a085;">주문이 성공적으로 접수되었습니다!</h3>
+            <p style="color: #666; margin-bottom: 20px;">주문번호: <strong id="completedOrderNumber"></strong></p>
+            <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+              <p style="margin: 4px 0;"><strong>입금자명:</strong> <span id="completedDepositor"></span></p>
+              <p style="margin: 4px 0;"><strong>연락처:</strong> <span id="completedContact"></span></p>
+              <p style="margin: 4px 0;"><strong>구매제품:</strong> <span id="completedProduct"></span></p>
+            </div>
+          </div>
+          <div class="field" style="text-align: center;">
+            <button id="btnOrderComplete" style="background: #16a085; min-width: 120px;">확인</button>
+          </div>
+          <div style="margin-top: 16px; padding: 12px; background: #f8f9fa; border-radius: 6px; text-align: center;">
+            <div style="font-size: 11px; color: #666; margin-bottom: 4px;">시스템 제공</div>
+            <a href="https://cx-tech-builder.netlify.app/" target="_blank" style="color: #222; text-decoration: none; font-weight: 500; font-size: 12px;">
+              CX Tech Builder
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PIN 인증 모달 -->
+    <div id="pinModal" class="modal">
+      <div class="modal__backdrop" onclick="closePinModal()"></div>
+      <div class="modal__content" role="dialog" aria-modal="true" aria-labelledby="pinTitle" style="max-width: 400px;">
+        <div class="modal__header">
+          <h2 id="pinTitle">관리자 인증</h2>
+          <button type="button" id="pinClose" class="icon-btn" aria-label="닫기">✖️</button>
+        </div>
+        <div class="modal__body">
+          <div class="field">
+            <label for="pinInput">PIN 번호 </label>
+            <input type="password" id="pinInput" placeholder="PIN 번호 입력" maxlength="6" inputmode="numeric" pattern="[0-9]*" />
+          </div>
+          <div class="field">
+            <button id="btnPinSubmit">확인</button>
+            <div id="pinMsg" class="msg"></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -346,48 +743,55 @@
           <button type="button" id="adminClose" class="icon-btn" aria-label="닫기">✖️</button>
         </div>
         <div class="modal__body">
-          <section class="admin-section">
-            <h3>주문 목록</h3>
+                    <section class="admin-section">
+            <h3>주문 목록 (이번 달)</h3>
             <div class="table-wrap">
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th>입금자명</th>
-                    <th>연락처</th>
-                    <th>구매제품</th>
-                    <th>주소</th>
-                    <th>상세주소</th>
-                  </tr>
-                </thead>
-                <tbody id="ordersTbody"></tbody>
-              </table>
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>주문번호</th>
+                      <th>주문시간</th>
+                      <th>입금자명</th>
+                      <th>연락처</th>
+                      <th>구매제품</th>
+                      <th>주소</th>
+                      <th>상세주소</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ordersTbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="admin-actions">
+              <button type="button" id="btnExportExcel" style="background: #27ae60;">엑셀로 내보내기</button>
+            </div>
+            <div style="margin-top: 20px; padding: 16px; background: #f8f9fa; border-radius: 8px; text-align: center;">
+              <div style="font-size: 12px; color: #666; margin-bottom: 8px;">시스템 개발</div>
+              <a href="https://cx-tech-builder.netlify.app/" target="_blank" style="color: #222; text-decoration: none; font-weight: 500; font-size: 14px;">
+                CX Tech Builder - 실무 중심 풀스택 개발자
+              </a>
             </div>
           </section>
 
-          <section class="admin-section">
-            <h3>제품 목록 편집</h3>
-            <div class="table-wrap">
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th>제품명</th>
-                    <th style="width:1%"></th>
-                  </tr>
-                </thead>
-                <tbody id="productsTbody"></tbody>
-              </table>
-            </div>
-            <div class="admin-actions">
-              <button type="button" id="btnAddProductRow">행 추가</button>
-              <button type="button" id="btnSaveProducts">제품 저장</button>
-            </div>
-          </section>
+
         </div>
       </div>
     </div>
+    
+    <!-- 개발자 정보 푸터 -->
+    <footer style="margin-top: 40px; padding: 20px 0; border-top: 1px solid #eee; text-align: center; color: #666; font-size: 12px;">
+      <div style="margin-bottom: 8px;">
+        <span>Powered by </span>
+        <a href="https://cx-tech-builder.netlify.app/" target="_blank" style="color: #222; text-decoration: none; font-weight: 500;">CX Tech Builder</a>
+      </div>
+      <div style="font-size: 11px; color: #999;">
+        실무 중심 풀스택 개발자 | 업무 효율화 솔루션
+      </div>
+    </footer>
   </body>
-  <!-- 카카오/다음 우편번호 라이브러리 -->
-  <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+  <!-- 주소 찾기 라이브러리 (필요시 주석 해제) -->
+  <!-- <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script> -->
 </html>
 
 
