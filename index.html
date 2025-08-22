@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>셀러 주문 수집 목업</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
       *, *::before, *::after { box-sizing: border-box; }
       body { font-family: Arial, sans-serif; margin: 24px; line-height: 1.45; -webkit-text-size-adjust: 100%; }
@@ -120,6 +121,11 @@
           gap: 8px;
         }
         .admin-actions button { width: 100%; }
+        
+        /* 모바일에서 설정 버튼 숨기기 */
+        #btnAdmin { 
+          display: none !important; 
+        }
         
         /* 푸터 모바일 최적화 */
         footer { 
@@ -430,28 +436,20 @@
             return;
           }
           
-          // CSV 데이터 생성
+          // Excel 데이터 생성
           const headers = ['주문번호', '주문시간', '입금자명', '연락처', '구매제품', '주소', '상세주소'];
-          const csvData = [headers.join(',')];
+          const excelData = [headers];
           
           rows.forEach(row => {
             const cells = Array.from(row.querySelectorAll('td'));
-            const rowData = cells.map(cell => {
-              // CSV에서 쉼표와 따옴표 처리
-              let text = cell.textContent.trim();
-              if (text.includes(',') || text.includes('"') || text.includes('\n')) {
-                text = '"' + text.replace(/"/g, '""') + '"';
-              }
-              return text;
-            });
-            csvData.push(rowData.join(','));
+            const rowData = cells.map(cell => cell.textContent.trim());
+            excelData.push(rowData);
           });
           
-          // 파일 다운로드
-          const csvContent = csvData.join('\n');
-          const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-          const link = document.createElement('a');
-          const url = URL.createObjectURL(blob);
+          // SheetJS를 사용하여 Excel 파일 생성
+          const ws = XLSX.utils.aoa_to_sheet(excelData);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, "주문목록");
           
           // 파일명 생성 (최근 3일 포함)
           const now = new Date();
@@ -462,18 +460,14 @@
           const endDate = now.getFullYear() + 
                          String(now.getMonth() + 1).padStart(2, '0') + 
                          String(now.getDate()).padStart(2, '0');
-          const fileName = `주문목록_${startDate}-${endDate}.csv`;
+          const fileName = `주문목록_${startDate}-${endDate}.xlsx`;
           
-          link.setAttribute('href', url);
-          link.setAttribute('download', fileName);
-          link.style.visibility = 'hidden';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
+          // Excel 파일 다운로드
+          XLSX.writeFile(wb, fileName);
           
-          alert('CSV 파일이 다운로드되었습니다. 엑셀에서 열어서 사용하세요.');
+          alert('엑셀 파일이 다운로드되었습니다.');
         } catch (e) {
-          alert('CSV 내보내기 중 오류가 발생했습니다: ' + e.message);
+          alert('엑셀 내보내기 중 오류가 발생했습니다: ' + e.message);
         } finally {
           btn.disabled = false;
           btn.textContent = originalText;
@@ -751,7 +745,7 @@
             <h3>주문 목록 (최근 3일)</h3>
             <div style="margin-bottom: 16px; padding: 12px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; color: #856404; font-size: 14px;">
               <strong>📋 데이터 보관 정책:</strong> 주문내역은 원활한 서버 관리를 위해 3일이 지난 데이터는 자동으로 삭제됩니다. 
-              <br>※ Raw 데이터는 매번 저장하여 보유하고 있습니다.
+              <br>※ Raw 데이터는 셀러께서 매번 저장하여 보유해 주세요.
             </div>
             <div class="table-wrap">
               <div class="table-wrap">
@@ -772,7 +766,7 @@
               </div>
             </div>
             <div class="admin-actions">
-              <button type="button" id="btnExportExcel" style="background: #27ae60;">CSV로 내보내기</button>
+                              <button type="button" id="btnExportExcel" style="background: #27ae60;">엑셀로 내보내기</button>
             </div>
             <div style="margin-top: 20px; padding: 16px; background: #f8f9fa; border-radius: 8px; text-align: center;">
               <div style="font-size: 12px; color: #666; margin-bottom: 8px;">시스템 개발</div>
