@@ -312,7 +312,7 @@
             // ===== 설정 영역 =====
             // 1) Google Apps Script를 웹앱으로 배포 후 생성된 URL을 입력하세요
             const API_URL =
-                "https://script.google.com/macros/s/AKfycbzhWp2LGj0n0ybQdXFbFxAOaiJfdekMV-lrWEs7CjVr_E4lmpToGbf5ELr2cISMkTrEHA/exec";
+                "https://script.google.com/macros/s/AKfycbwKZod42AbOd7LH13mIoJT7EByqtEIAsIbH-nMMx3n8uo4TRPy46R6LOtTOir_VJ25JRQ/exec";
 
             // 2) 관리자 PIN 번호 (6자리)를 입력하세요 - 보안 강화
             const ADMIN_PIN = (function () {
@@ -325,27 +325,22 @@
             // ====================
 
             /**
-             * 한국 시간대 기준 날짜/시간 처리 유틸리티
-             * 300명 이상의 셀러가 사용하는 시스템의 안정성을 위한 정확한 시간 처리
+             * 브라우저의 현재 시간을 사용합니다.
+             * Google Apps Script는 이미 한국 시간대로 처리됩니다.
              */
-            function getKoreanDateTime() {
-                const now = new Date();
-                // 브라우저 시간대를 한국 시간대로 변환
-                const koreanTime = new Date(
-                    now.toLocaleString("en-US", { timeZone: "Asia/Seoul" })
-                );
-                return koreanTime;
+            function getCurrentDateTime() {
+                return new Date();
             }
 
             /**
-             * 정확한 날짜 범위 계산 (시간대 안전)
+             * 정확한 날짜 범위 계산
              * @param {number} days - 일수
              * @returns {Object} {start, end} - 시작일과 종료일
              */
             function calculateDateRange(days) {
-                const now = getKoreanDateTime();
+                const now = getCurrentDateTime();
 
-                // 정확한 N일 전 계산 (시간대 고려)
+                // 정확한 N일 전 계산
                 const startDate = new Date(
                     now.getTime() - days * 24 * 60 * 60 * 1000
                 );
@@ -450,6 +445,14 @@
                 document
                     .getElementById("btnDateRangeExport")
                     .addEventListener("click", exportToExcelCustom);
+
+                // 날짜 입력 제한 이벤트 리스너
+                document
+                    .getElementById("startDate")
+                    .addEventListener("change", validateDateRange);
+                document
+                    .getElementById("endDate")
+                    .addEventListener("change", validateDateRange);
                 document
                     .getElementById("product")
                     .addEventListener("keypress", function (e) {
@@ -835,7 +838,7 @@
                 }
             }
 
-            // 최근 3개월 전체 엑셀 내보내기
+            // 최근 3일 전체 엑셀 내보내기
             async function exportToExcel3Months() {
                 const btn = document.getElementById("btnExportExcel3Months");
                 const originalText = btn.textContent;
@@ -843,8 +846,8 @@
                 btn.textContent = "내보내는 중...";
 
                 try {
-                    // 3개월 전 날짜 계산 (시간대 안전 처리)
-                    const dateRange = calculateDateRange(90);
+                    // 3일 전 날짜 계산 (시간대 안전 처리)
+                    const dateRange = calculateDateRange(3);
                     const startDate = dateRange.start
                         .toISOString()
                         .split("T")[0];
@@ -859,7 +862,7 @@
 
                     if (response.status === "success") {
                         if (response.orders.length === 0) {
-                            alert("최근 3개월간 주문 데이터가 없습니다.");
+                            alert("최근 3일간 주문 데이터가 없습니다.");
                             return;
                         }
 
@@ -909,7 +912,7 @@
                         XLSX.utils.book_append_sheet(wb, ws, "주문목록");
 
                         // 파일명 생성
-                        const fileName = `주문목록_최근3개월_${startDate}-${endDate}_총${response.orders.length}건.xlsx`;
+                        const fileName = `주문목록_최근3일_${startDate}-${endDate}_총${response.orders.length}건.xlsx`;
 
                         // Excel 파일 다운로드
                         XLSX.writeFile(wb, fileName);
@@ -936,12 +939,25 @@
                 const startDateInput = document.getElementById("startDate");
                 const endDateInput = document.getElementById("endDate");
 
-                // 기본값 설정 (최근 1개월, 시간대 안전 처리)
-                const dateRange = calculateDateRange(30);
-                startDateInput.value = dateRange.start
+                // 오늘 날짜 계산
+                const today = getCurrentDateTime();
+                const todayStr = today.toISOString().split("T")[0];
+
+                // 기본값 설정 (오늘 포함 3일)
+                const threeDaysAgo = new Date(
+                    today.getTime() - 2 * 24 * 60 * 60 * 1000
+                );
+                const threeDaysAgoStr = threeDaysAgo
                     .toISOString()
                     .split("T")[0];
-                endDateInput.value = dateRange.end.toISOString().split("T")[0];
+
+                startDateInput.value = threeDaysAgoStr;
+                endDateInput.value = todayStr;
+
+                // 날짜 입력 제한 설정
+                startDateInput.max = todayStr;
+                endDateInput.max = todayStr;
+                startDateInput.min = threeDaysAgoStr;
 
                 modal.classList.add("open");
             }
@@ -951,6 +967,43 @@
                 document
                     .getElementById("dateRangeModal")
                     .classList.remove("open");
+            }
+
+            // 날짜 범위 검증 (최대 3일 제한)
+            function validateDateRange() {
+                const startDateInput = document.getElementById("startDate");
+                const endDateInput = document.getElementById("endDate");
+                const exportBtn = document.getElementById("btnDateRangeExport");
+
+                if (!startDateInput.value || !endDateInput.value) return;
+
+                const startDate = new Date(startDateInput.value);
+                const endDate = new Date(endDateInput.value);
+                const today = getCurrentDateTime();
+                today.setHours(0, 0, 0, 0);
+
+                // 오늘 이후 날짜 선택 방지
+                if (endDate > today) {
+                    endDateInput.value = today.toISOString().split("T")[0];
+                    alert("오늘 이후 날짜는 선택할 수 없습니다.");
+                    return;
+                }
+
+                // 3일 초과 선택 방지
+                const diffTime = endDate.getTime() - startDate.getTime();
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                if (diffDays > 2) {
+                    // 3일 (시작일 포함)
+                    alert("최대 3일까지만 선택할 수 있습니다.");
+                    // 시작일을 3일 전으로 자동 조정
+                    const newStartDate = new Date(
+                        endDate.getTime() - 2 * 24 * 60 * 60 * 1000
+                    );
+                    startDateInput.value = newStartDate
+                        .toISOString()
+                        .split("T")[0];
+                }
             }
 
             // 기간 지정 엑셀 내보내기
@@ -1798,7 +1851,7 @@
                                     min-height: 56px;
                                 "
                             >
-                                📊 최근 3개월 전체
+                                📊 최근 3일 전체
                             </button>
                             <button
                                 type="button"
@@ -1955,7 +2008,7 @@
                             </div>
                         </div>
                         <p style="color: #666; font-size: 14px">
-                            선택한 기간의 모든 주문 데이터를 엑셀로 내보냅니다.
+                            최대 3일까지만 선택 가능합니다. (오늘 포함)
                         </p>
                     </div>
                     <div

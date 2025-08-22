@@ -18,15 +18,11 @@ const SPREADSHEET_ID = "1t827-32lLymCf4jGVP--_mbYv1jSC5xFtcV2q2BR3SI"; // 구글
 const SHEET_NAME_ORDERS = "시트1"; // 주문 저장 시트명을 여기에 입력하세요
 
 /**
- * 한국 시간대 기준 날짜/시간 처리 유틸리티
- * 300명 이상의 셀러가 사용하는 시스템의 안정성을 위한 정확한 시간 처리
+ * Google Apps Script는 이미 한국 시간대로 실행되므로
+ * 단순히 현재 시간을 반환합니다.
  */
-function getKoreanDateTime() {
-    const now = new Date();
-    // Google Apps Script는 기본적으로 서버 시간대 사용
-    // 한국 시간대(UTC+9)로 명시적 변환
-    const koreanTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-    return koreanTime;
+function getCurrentDateTime() {
+    return new Date();
 }
 
 /**
@@ -173,9 +169,15 @@ function handleGetOrders(params) {
     const values = range.getValues();
 
     // 최근 3일간의 주문만 조회 (시간대 안전 처리)
-    const dateRange = calculateDateRange(3);
-    const threeDaysAgo = dateRange.start;
-    const currentTime = dateRange.end;
+    // 최근 3일간의 주문만 조회 (Google Apps Script는 이미 한국시간으로 실행됨)
+    const now = new Date();
+
+    // 3일 전 00:00:00
+    const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+    threeDaysAgo.setHours(0, 0, 0, 0);
+
+    // 현재 시간
+    const currentTime = new Date();
 
     // 성능 최적화: map과 filter를 한 번에 처리
     const allOrders = [];
@@ -315,8 +317,8 @@ function handleGetOrdersByDateRange(params) {
 }
 
 function generateOrderNumber() {
-    // 한국 시간대 기준 주문번호 생성
-    const now = getKoreanDateTime();
+    // 현재 시간 사용 (Google Apps Script는 이미 한국시간으로 실행됨)
+    const now = new Date();
 
     const year = now.getFullYear().toString().slice(-2);
     const month = String(now.getMonth() + 1).padStart(2, "0");
@@ -365,7 +367,7 @@ function handleSubmit(data, params) {
     ]);
 
     const orderNumber = generateOrderNumber();
-    const now = getKoreanDateTime();
+    const now = new Date();
 
     // 성능 최적화: 한 번에 데이터 추가
     sheet.appendRow([
@@ -429,9 +431,10 @@ function cleanupOldOrders() {
             return;
         }
 
-        // 1주일 전 날짜 계산 (시간대 안전 처리)
-        const dateRange = calculateDateRange(7);
-        const oneWeekAgo = dateRange.start;
+        // 1주일 전 날짜 계산 (Google Apps Script는 한국시간으로 실행됨)
+        const now = new Date();
+        const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        oneWeekAgo.setHours(0, 0, 0, 0);
 
         console.log(
             `데이터 정리 시작: ${oneWeekAgo.toLocaleString(
