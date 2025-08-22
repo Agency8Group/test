@@ -79,16 +79,15 @@ function handleGetOrders(params) {
   const range = sheet.getRange(2, 1, lastRow - 1, 7);
   const values = range.getValues();
   
-  // 현재 월의 시작과 끝 계산 (Google Apps Script는 이미 한국시간으로 실행됨)
+  // 최근 3일간의 주문만 조회 (Google Apps Script는 이미 한국시간으로 실행됨)
   const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth();
   
-  // 이번 달 1일 00:00:00
-  const monthStart = new Date(currentYear, currentMonth, 1);
+  // 3일 전 00:00:00
+  const threeDaysAgo = new Date(now.getTime() - (3 * 24 * 60 * 60 * 1000));
+  threeDaysAgo.setHours(0, 0, 0, 0);
   
-  // 다음 달 1일 00:00:00
-  const nextMonthStart = new Date(currentYear, currentMonth + 1, 1);
+  // 현재 시간
+  const currentTime = new Date();
   
   // 성능 최적화: map과 filter를 한 번에 처리
   const orders = [];
@@ -96,8 +95,8 @@ function handleGetOrders(params) {
     const r = values[i];
     const orderTime = r[6] ? new Date(r[6]) : null;
     
-    // 이번 달 주문만 필터링
-    if (orderTime && orderTime >= monthStart && orderTime < nextMonthStart) {
+    // 최근 3일간 주문만 필터링
+    if (orderTime && orderTime >= threeDaysAgo && orderTime <= currentTime) {
       orders.push({
         orderNumber: r[0] != null ? String(r[0]) : "",
         depositorName: r[1] != null ? String(r[1]) : "",
