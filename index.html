@@ -546,38 +546,45 @@
                                     '<tr><td colspan="7">최근 3일간 접수된 주문이 없습니다.</td></tr>';
                             }
                         } else {
-                            // DocumentFragment 사용으로 DOM 조작 최적화
-                            const fragment = document.createDocumentFragment();
-                            ordersRes.orders.forEach(function (o) {
-                                // 한국시간으로 표시 (이미 한국시간으로 저장되어 있음)
-                                let orderTimeStr = "";
-                                if (o.orderTime) {
-                                    const orderDate = new Date(o.orderTime);
-                                    orderTimeStr = orderDate.toLocaleString(
-                                        "ko-KR",
-                                        {
-                                            year: "numeric",
-                                            month: "2-digit",
-                                            day: "2-digit",
-                                            hour: "2-digit",
-                                            minute: "2-digit",
-                                            second: "2-digit",
-                                        }
-                                    );
-                                }
+                                                         // 주문 데이터를 최신순으로 정렬 (주문시간 기준)
+                             const sortedOrders = ordersRes.orders.sort((a, b) => {
+                                 const timeA = a.orderTime ? new Date(a.orderTime).getTime() : 0;
+                                 const timeB = b.orderTime ? new Date(b.orderTime).getTime() : 0;
+                                 return timeB - timeA; // 최신순 (내림차순)
+                             });
 
-                                const tr = document.createElement("tr");
-                                tr.innerHTML = `
-                  <td>${escapeHtml(o.orderNumber || "")}</td>
-                  <td>${escapeHtml(orderTimeStr)}</td>
-                  <td>${escapeHtml(o.depositorName || "")}</td>
-                  <td>${escapeHtml(o.contact || "")}</td>
-                  <td>${escapeHtml(o.product || "")}</td>
-                  <td>${escapeHtml(o.address || "")}</td>
-                  <td>${escapeHtml(o.addressDetail || "")}</td>
-                `;
-                                fragment.appendChild(tr);
-                            });
+                             // DocumentFragment 사용으로 DOM 조작 최적화
+                             const fragment = document.createDocumentFragment();
+                             sortedOrders.forEach(function (o) {
+                                 // 한국시간으로 표시 (이미 한국시간으로 저장되어 있음)
+                                 let orderTimeStr = "";
+                                 if (o.orderTime) {
+                                     const orderDate = new Date(o.orderTime);
+                                     orderTimeStr = orderDate.toLocaleString(
+                                         "ko-KR",
+                                         {
+                                             year: "numeric",
+                                             month: "2-digit",
+                                             day: "2-digit",
+                                             hour: "2-digit",
+                                             minute: "2-digit",
+                                             second: "2-digit",
+                                         }
+                                     );
+                                 }
+
+                                 const tr = document.createElement("tr");
+                                 tr.innerHTML = `
+                   <td>${escapeHtml(o.orderNumber || "")}</td>
+                   <td>${escapeHtml(orderTimeStr)}</td>
+                   <td>${escapeHtml(o.depositorName || "")}</td>
+                   <td>${escapeHtml(o.contact || "")}</td>
+                   <td>${escapeHtml(o.product || "")}</td>
+                   <td>${escapeHtml(o.address || "")}</td>
+                   <td>${escapeHtml(o.addressDetail || "")}</td>
+                 `;
+                                 fragment.appendChild(tr);
+                             });
 
                             if (isInitial) {
                                 ordersTbody.innerHTML = "";
