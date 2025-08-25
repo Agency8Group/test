@@ -308,20 +308,7 @@
                     display: none !important;
                 }
 
-                /* 주소 검색 모달 모바일 최적화 */
-                #addressModal .modal__content {
-                    width: 96vw;
-                    margin: 2vh auto;
-                    max-height: 96vh;
-                }
-                #addressModal .modal__body {
-                    padding: 20px 16px;
-                }
-                #btnOpenAddressSearch {
-                    min-height: 56px;
-                    font-size: 16px;
-                    font-weight: 500;
-                }
+
 
                 /* 푸터 모바일 최적화 */
                 footer {
@@ -494,30 +481,13 @@
                         }
                     });
 
-                // 주소 검색 모달 이벤트 리스너
-                document
-                    .getElementById("addressClose")
-                    .addEventListener("click", closeAddressModal);
-                document
-                    .getElementById("btnOpenAddressSearch")
-                    .addEventListener("click", openAddressSearch);
 
-                // 연락처 자동 하이픈 추가
+
+                // 연락처 자동 하이픈 추가 (포커스를 잃을 때만)
                 document
                     .getElementById("contact")
-                    .addEventListener("input", formatPhoneNumber);
-                document
-                    .getElementById("contact")
-                    .addEventListener("keydown", function (e) {
-                        // 숫자, 백스페이스, 삭제, 화살표 키만 허용
-                        if (
-                            !/[\d\b\-\u2190-\u2193\u2191\u2192]/.test(e.key) &&
-                            !e.ctrlKey &&
-                            !e.metaKey
-                        ) {
-                            e.preventDefault();
-                        }
-                    });
+                    .addEventListener("blur", formatPhoneNumber);
+
             }
 
             // 페이지네이션 상태 관리
@@ -1173,23 +1143,11 @@
             }
 
             function findAddress() {
-                // 모바일에서는 모달 방식, 데스크톱에서는 팝업 방식
-                if (isMobile()) {
-                    openAddressModal();
-                } else {
-                    openAddressSearch();
-                }
+                // 모바일과 데스크톱 모두 바로 주소 검색 실행
+                openAddressSearch();
             }
 
-            function openAddressModal() {
-                document.getElementById("addressModal").classList.add("open");
-            }
 
-            function closeAddressModal() {
-                document
-                    .getElementById("addressModal")
-                    .classList.remove("open");
-            }
 
             function openAddressSearch() {
                 if (window.daum && window.daum.Postcode) {
@@ -1213,11 +1171,6 @@
                             var input = document.getElementById("address");
                             input.value = full.trim();
                             input.focus();
-
-                            // 모바일에서 모달이 열려있다면 닫기
-                            if (isMobile()) {
-                                closeAddressModal();
-                            }
                         },
                     }).open();
                 } else {
@@ -1225,10 +1178,6 @@
                     const addr = prompt("주소를 입력하세요");
                     if (addr) {
                         document.getElementById("address").value = addr.trim();
-                        // 모바일에서 모달이 열려있다면 닫기
-                        if (isMobile()) {
-                            closeAddressModal();
-                        }
                     }
                 }
             }
@@ -1281,23 +1230,28 @@
 
             function formatPhoneNumber(e) {
                 const input = e.target;
-                let value = input.value.replace(/[^\d]/g, ""); // 숫자만 추출
-
+                let value = input.value;
+                
+                // 숫자만 추출
+                let numbers = value.replace(/[^\d]/g, "");
+                
                 // 최대 11자리로 제한
-                if (value.length > 11) {
-                    value = value.slice(0, 11);
+                if (numbers.length > 11) {
+                    numbers = numbers.slice(0, 11);
                 }
 
                 // 하이픈 추가 (010-0000-0000 형식)
-                if (value.length >= 3 && value.length <= 7) {
-                    value = value.slice(0, 3) + "-" + value.slice(3);
-                } else if (value.length >= 8) {
+                if (numbers.length >= 3 && numbers.length <= 7) {
+                    value = numbers.slice(0, 3) + "-" + numbers.slice(3);
+                } else if (numbers.length >= 8) {
                     value =
-                        value.slice(0, 3) +
+                        numbers.slice(0, 3) +
                         "-" +
-                        value.slice(3, 7) +
+                        numbers.slice(3, 7) +
                         "-" +
-                        value.slice(7);
+                        numbers.slice(7);
+                } else {
+                    value = numbers;
                 }
 
                 input.value = value;
@@ -1376,14 +1330,14 @@
 
             <div class="field">
                 <label for="contact">연락처</label>
-                <input
-                    type="tel"
-                    id="contact"
-                    inputmode="numeric"
-                    placeholder="010-0000-0000"
-                    maxlength="13"
-                    autocomplete="tel"
-                />
+                                 <input
+                     type="tel"
+                     id="contact"
+                     inputmode="numeric"
+                     placeholder="01012345678"
+                     maxlength="11"
+                     autocomplete="tel"
+                 />
             </div>
 
             <div class="field">
@@ -1723,91 +1677,7 @@
             </div>
         </div>
 
-        <!-- 주소 검색 모달 -->
-        <div id="addressModal" class="modal">
-            <div class="modal__backdrop" onclick="closeAddressModal()"></div>
-            <div
-                class="modal__content"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="addressTitle"
-                style="max-width: 600px"
-            >
-                <div class="modal__header">
-                    <h2 id="addressTitle">주소 검색</h2>
-                    <button
-                        type="button"
-                        id="addressClose"
-                        class="icon-btn"
-                        aria-label="닫기"
-                    >
-                        ✖️
-                    </button>
-                </div>
-                <div class="modal__body">
-                    <div style="text-align: center; padding: 20px 0">
-                        <div style="font-size: 48px; margin-bottom: 16px">
-                            🏠
-                        </div>
-                        <h3 style="margin-bottom: 16px; color: #333">
-                            주소를 검색해주세요
-                        </h3>
-                        <div
-                            style="
-                                background: #f8f9fa;
-                                padding: 16px;
-                                border-radius: 8px;
-                                margin-bottom: 20px;
-                            "
-                        >
-                            <p style="margin: 8px 0; color: #666">
-                                아래 버튼을 클릭하여 주소 검색 서비스를
-                                이용하세요.
-                            </p>
-                        </div>
-                    </div>
-                    <div class="field" style="text-align: center">
-                        <button
-                            id="btnOpenAddressSearch"
-                            style="background: #16a085; min-width: 200px"
-                        >
-                            주소 검색하기
-                        </button>
-                    </div>
-                    <div
-                        style="
-                            margin-top: 16px;
-                            padding: 12px;
-                            background: #f8f9fa;
-                            border-radius: 6px;
-                            text-align: center;
-                        "
-                    >
-                        <div
-                            style="
-                                font-size: 11px;
-                                color: #666;
-                                margin-bottom: 4px;
-                            "
-                        >
-                            주소 검색 서비스 제공
-                        </div>
-                        <a
-                            href="https://cx-tech-builder.netlify.app/"
-                            target="_blank"
-                            style="
-                                color: #222;
-                                text-decoration: none;
-                                font-weight: 500;
-                                font-size: 12px;
-                            "
-                        >
-                            CX Tech Builder
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
+
 
         <!-- 관리자 모달 -->
         <div id="adminModal" class="modal">
