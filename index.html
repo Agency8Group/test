@@ -66,6 +66,22 @@
                 appearance: none;
                 transition: border-color 0.2s ease;
             }
+            
+            /* placeholder 텍스트 스타일 */
+            input::placeholder {
+                color: #999;
+                font-size: 14px;
+                line-height: 1.4;
+                opacity: 1;
+            }
+            
+            /* 긴 placeholder 텍스트를 위한 특별 스타일 */
+            #product::placeholder {
+                font-size: 12px;
+                line-height: 1.2;
+                word-break: keep-all;
+                white-space: normal;
+            }
             input[type="text"]:focus,
             input[type="tel"]:focus,
             select:focus {
@@ -226,6 +242,22 @@
                     font-size: 16px; /* 모바일에서 자동 확대 방지 */
                     padding: 12px;
                     min-height: 48px; /* 터치하기 쉬운 크기 */
+                }
+                
+                /* 모바일에서 placeholder 텍스트 최적화 */
+                input::placeholder {
+                    color: #999;
+                    font-size: 12px;
+                    line-height: 1.3;
+                    opacity: 1;
+                }
+                
+                /* 긴 placeholder 텍스트를 위한 특별 스타일 */
+                #product::placeholder {
+                    font-size: 11px;
+                    line-height: 1.2;
+                    word-break: keep-all;
+                    white-space: normal;
                 }
                 button {
                     font-size: 16px;
@@ -1360,7 +1392,7 @@
                     <input
                         type="text"
                         id="product"
-                        placeholder="ex)라운드티셔츠 블랙 1개,가운 브라운색상 2개"
+                        placeholder="ex)티셔츠 S사이즈 블랙 1개 / 제품명 사이즈 색상 수량"
                         maxlength="100"
                         style="flex: 1"
                     />
